@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>clacclacclac</title>
+    <script type="text/javascript" src="tiling.js"></script>
+    <script type="text/javascript" src="lib.js"></script>
+    <style>
+    	* { padding: 0; margin: 0; }
+    	canvas { background: #eee; display: block; margin: 0 auto; }
+    </style>
+</head>
+<body onload="start()">
+
+<canvas id="gameCanvas" width="600" height="480" style="margin-top:80px;"></canvas>
+
+<script>
+    
+
+    
+    
+    
+    function Game(_initDiff, _diffRamp, _strikes,_allowedTime){
+        this.score = 0;
+        this.strikes = _strikes;
+        this.initDiff = _initDiff;
+        this.diffRamp = _diffRamp;
+        this.allowedTime = _allowedTime;
+        
+    }
+    
+   
+    
+   
+    
+    function start(){
+        
+        //document.addEventListener("keyup", keyUpHandler, false);
+        
+        //graphics config
+        var c = document.getElementById('gameCanvas');
+        var ctx = c.getContext("2d");         
+        ctx.font="12px Arial";
+        
+        //gameplay config
+        
+        //allowedTime is delay before an active tile causes gameover
+        var allowedTime = 4000;
+        
+        //timepertick controls FPS limit
+        var timepertick = 16;
+        
+        //diff controls starting time between new tile activated
+        var diff = 1000;
+        //diffRamp controls the rate at which diff decreases
+        
+        var diffRamp = 0.993;
+        var lives = 3;
+        var state = "running";
+        
+        
+        var prevScore;
+        var game = new Game(diff,diffRamp,lives,allowedTime);
+        
+        
+        var qwertyKeys = ['49','50','51','52','53','54','55','56','57','48',
+                              '81', '87','69','82','84','89','85','73','79','80',
+                              '65','83','68','70','71','72','74','75','76',
+                              '90','88','67','86','66','78','77']; 
+        
+        
+        var ticksPassed = 0; 
+        var tileArray = createTiles(qwertyKeys); 
+        document.addEventListener("keydown", keyDownHandler, false);
+        console.log("Check states of tileArray:");
+        tileArray.forEach(function(item,index){
+           console.log(item.tileState); 
+        });
+  
+        //sets the game to run at 60fps
+        console.log("starting game...")
+        setInterval(function(){loop()},timepertick);
+      
+        
+        function loop(){
+            if (state=="running"){
+                var reset = tick();
+            
+                if (reset){
+                    prevScore = game.score;
+                    state = "lost";
+                    game = new Game(diff,diffRamp,lives,"running",allowedTime);
+                    tileArray.forEach(function(item, index){
+                        item.active = false;
+                        item.activeTime = 0;
+                    });
+                }
+                else{
+                  render();  
+                }
+            }
+            else if (state=="lost"){
+                
+                
+                ctx.clearRect(0,0,600,480);
+                ctx.beginPath()
+                ctx.fillStyle = "#b3b3b3";
+                ctx.fillRect(0,0,640,480);
+                ctx.closePath();
+                ctx.beginPath()
+                ctx.fillStyle = "#FFFFFF";
+                ctx.fillText("Score: " + prevScore + ", press f5 to restart.", 200, 240);
+                ctx.closePath();
+
+                
+                
+            }
+            
+            
+            
+        }
+      
+        
+        function tick(){
+            ticksPassed++;
+            
+            // sets a new tile active at a rate in accordance with the initDiff value
+            if (ticksPassed*16.6 >= game.initDiff){
+                setActive();
+                game.initDiff = game.initDiff * game.diffRamp;                
+                ticksPassed = 0;
+            }
+            
+            //resets the game if player out of strikes
+            if (game.strikes<1){
+                ticksPassed = 0;
+                return true;
+            }
+            
+            
+            //ends the game if tile state is red for too long
+            for (var i = 0; i<tileArray.length; i++ ){
+                if (tileArray[i].tileState=="red"){
+                    
+                    if (tileArray[i].activeTime > game.allowedTime/16.6){
+                        return true;
+                    }
+                    tileArray[i].activeTime++;
+                    tileArray[i].colorVal -= 2000;
+                }
+            }
+            
+            
+            return false;
+                       
+        }
+        
+        function setActive(){
+            var validTile = false;
+            var tileIndex = randomInt(0, tileArray.length-1);
+            while (!validTile){
+                console.log("activating tile...");
+                
+                if (tileArray[tileIndex].active==false){
+                    
+                    //sets a red tile
+                    tileArray[tileIndex].active = true;                    
+                    tileArray[tileIndex].tileState = "red";                    
+                    validTile = true;
+                }
+                
+                tileIndex = randomInt(0, tileArray.length-1);
+            }
+            
+        }
+        
+          
+        function render(){
+            ctx.clearRect(0,0,600,480);i
+            tileArray.forEach(function(item, index){
+                
+                //draws the tile as red if it's set to active, this makes it look dangerous
+                if (item.active){
+                    var printColor = item.colorVal;                    
+                    printColor = "#" + decimalToHex(printColor);                   
+                    ctx.fillStyle = printColor;
+                }
+                else {
+                    ctx.fillStyle = "#FFFFFF";
+                }
+                
+                //uses each tiles gfx properties to draw it in right spot.
+                ctx.beginPath();
+                ctx.fillRect(item.gfxPosX,item.gfxPosY,item.gfxWidth,item.gfxHeight);
+                
+                
+                //draws label on to each key
+                ctx.fillStyle = "#FFFFFF";
+                ctx.fillText(item.keylabel,item.gfxPosX + 10,item.gfxPosY + 20);
+                if (item.active){                                      
+                    ctx.fillStyle = "#000000";
+                    //ctx.fillText(item.activeTime,item.gfxPosX+10,item.gfxPosY+10);
+                }                 
+                
+                ctx.closePath();
+            });
+            
+            //render score count in top left corner
+            ctx.beginPath()
+            ctx.fillStyle = "#000000";
+            ctx.fillText(game.score, 20, 20);
+            ctx.closePath();
+            for (var i = 0; i<game.strikes; i++){
+                ctx.beginPath()
+                ctx.fillStyle = "#000000";
+                ctx.fillText("X", 400 + i*20, 20);
+                ctx.closePath();
+            }
+            
+            
+            
+        }
+        
+    
+        
+        
+        function keyDownHandler(e){      
+            
+            qwertyKeys.forEach(function(item,index){
+                if (e.keyCode==item){
+                    tileAction(index);
+                }
+            });
+        }
+        
+        function tileAction(index){
+            console.log(tileArray[index].keylabel + " pressed");
+            console.log("my state is:" + tileArray[index].tileState);
+            if (tileArray[index].tileState == "red"){
+                        console.log("changing back to normal...");
+                        tileArray[index].active=false;
+                        tileArray[index].tileState = "normal";
+                        tileArray[index].activeTime=0;
+                        game.score++;
+                        return;
+                    }
+                                    
+            game.strikes--;
+            console.log("strikes remaining: " + game.strikes);
+            ctx.clearRect(0,0,600,480);
+            ctx.beginPath()                        
+            //makes the screen flash red
+            ctx.fillStyle = "#FF0000";
+            ctx.fillRect(0,0,640,480);
+            ctx.closePath();                        
+    
+        }
+        
+        
+        
+        
+       
+    }
+    
+    
+    
+   
+</script>
+
+</body>
+</html>
